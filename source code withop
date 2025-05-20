@@ -1,0 +1,1198 @@
+@@ -0,0 +1,2727 @@
+import pandas as pd
+data =pd.read_csv("/content/yahoo_stock.csv")
+import pandas as pd
+import numpy as np
+# Assuming you have your data loaded in a DataFrame called 'data' with
+a 'Close' column and a DatetimeIndex
+# 1. Rolling Window Features
+# Moving Averages
+data['MA_5'] = data['Close'].rolling(window=5).mean()
+data['MA_10'] = data['Close'].rolling(window=10).mean()
+data['MA_20'] = data['Close'].rolling(window=20).mean()
+# RSI (Relative Strength Index) - You might need to install the 'ta' 
+library
+# !pip install ta==0.10.0
+# from ta.momentum import RSIIndicator
+# rsi_indicator = RSIIndicator(close=data['Close'], window=14) # 
+Default window is 14
+# data['RSI'] = rsi_indicator.rsi()
+# MACD (Moving Average Convergence Divergence)
+# from ta.trend import MACD
+# macd_indicator = MACD(close=data['Close'], window_slow=26, 
+window_fast=12, window_sign=9) # Default windows
+# data['MACD'] = macd_indicator.macd()
+# data['MACD_Signal'] = macd_indicator.macd_signal()
+# data['MACD_Diff'] = macd_indicator.macd_diff()
+# Bollinger Bands
+# from ta.volatility import BollingerBands
+# bb_indicator = BollingerBands(close=data['Close'], window=20, 
+window_dev=2) # Default window and deviation
+# data['BB_High'] = bb_indicator.bollinger_hband()
+# data['BB_Low'] = bb_indicator.bollinger_lband()
+# 2. Lagged Return Features
+data['Return_1'] = data['Close'].pct_change(1) # 1-day lagged return
+data['Return_5'] = data['Close'].pct_change(5) # 5-day lagged return
+# ... add more lags as needed
+# 3. Sentiment Score Lags (Assuming you have a 'Sentiment_Score' 
+column)
+# data['Sentiment_Lag_1'] = data['Sentiment_Score'].shift(1)
+# data['Sentiment_Lag_2'] = data['Sentiment_Score'].shift(2)
+# ... add more sentiment lags as needed
+# Drop rows with NaN values introduced by lagging/rolling
+data.dropna(inplace=True)
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from statsmodels.tsa.arima.model import ARIMA
+from sklearn.metrics import mean_squared_error
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, GRU, Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+# from transformers import TFAutoModelForSequenceClassification
+# 1. ARIMA Model (Baseline)
+# Assuming your data is in a DataFrame called 'data' with a 'Close' 
+column as the target variable
+# Split data into train and test sets
+train_data = data['Close'][:-30] # Use all but the last 30 days for 
+training
+test_data = data['Close'][-30:] # Use the last 30 days for testing
+# Grid search for ARIMA parameters (p, d, q)
+# This is a simplified example; you might want to expand the search 
+space
+best_arima_model = None
+best_mse = float('inf')
+for p in range(1, 6):
+ for d in range(0, 3):
+ for q in range(1, 6):
+ try:
+ model = ARIMA(train_data, order=(p, d, q))
+ model_fit = model.fit()
+ predictions = model_fit.predict(start=len(train_data),
+end=len(data)-1)
+ mse = mean_squared_error(test_data, predictions)
+ if mse < best_mse:
+ best_mse = mse
+ best_arima_model = model_fit
+ except:
+ continue
+print("Best ARIMA Model:", best_arima_model.summary())
+# 2. Deep Learning Models (LSTM, GRU, Transformer)
+# Data Preprocessing
+# Scale the data using MinMaxScaler
+scaler = MinMaxScaler()
+data['Close_Scaled'] =
+scaler.fit_transform(data['Close'].values.reshape(-1, 1))
+# Create sequences for LSTM/GRU/Transformer input
+def create_sequences(dataset, look_back=60):
+ X, Y = [], []
+ for i in range(len(dataset)-look_back-1):
+ a = dataset[i:(i+look_back), 0]
+ X.append(a)
+ Y.append(dataset[i + look_back, 0])
+ return np.array(X), np.array(Y)
+look_back = 60 # Number of previous days to consider
+X, Y = create_sequences(data[['Close_Scaled']].values, look_back)
+# Split into train and test sets
+train_size = int(len(X) * 0.8)
+X_train, X_test = X[:train_size], X[train_size:]
+Y_train, Y_test = Y[:train_size], Y[train_size:]
+# LSTM Model
+model_lstm = Sequential()
+model_lstm.add(LSTM(units=50, return_sequences=True, 
+input_shape=(X_train.shape[1], 1)))
+model_lstm.add(Dropout(0.2))
+model_lstm.add(LSTM(units=50))
+model_lstm.add(Dropout(0.2))
+model_lstm.add(Dense(units=1))
+model_lstm.compile(optimizer='adam', loss='mean_squared_error')
+# GRU Model
+model_gru = Sequential()
+model_gru.add(GRU(units=50, return_sequences=True, 
+input_shape=(X_train.shape[1], 1)))
+model_gru.add(Dropout(0.2))
+model_gru.add(GRU(units=50))
+model_gru.add(Dropout(0.2))
+model_gru.add(Dense(units=1))
+model_gru.compile(optimizer='adam', loss='mean_squared_error')
+# # Transformer Encoder Model (Requires 'transformers' library)
+# # !pip install transformers==4.31.0
+# model_transformer = 
+TFAutoModelForSequenceClassification.from_pretrained("bert-baseuncased", num_labels=1)
+# model_transformer.compile(optimizer='adam', 
+loss='mean_squared_error')
+# Training the models
+early_stopping = EarlyStopping(monitor='val_loss', patience=10)
+model_lstm.fit(X_train, Y_train, epochs=100, batch_size=32, 
+validation_split=0.2, callbacks=[early_stopping])
+model_gru.fit(X_train, Y_train, epochs=100, batch_size=32, 
+validation_split=0.2, callbacks=[early_stopping])
+# model_transformer.fit(X_train, Y_train, epochs=100, batch_size=32, 
+validation_split=0.2, callbacks=[early_stopping])
+# ... (Evaluation and prediction code)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/
+tsa_model.py:473: ValueWarning: An unsupported index was provided. As 
+a result, forecasts cannot be generated. To use the model for 
+forecasting, use one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/base/model.py:607:
+ConvergenceWarning: Maximum Likelihood optimization failed to 
+converge. Check mle_retvals
+ warnings.warn("Maximum Likelihood optimization failed to "
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/base/model.py:607:
+ConvergenceWarning: Maximum Likelihood optimization failed to 
+converge. Check mle_retvals
+ warnings.warn("Maximum Likelihood optimization failed to "
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/base/model.py:607:
+ConvergenceWarning: Maximum Likelihood optimization failed to 
+converge. Check mle_retvals
+ warnings.warn("Maximum Likelihood optimization failed to "
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/base/model.py:607:
+ConvergenceWarning: Maximum Likelihood optimization failed to 
+converge. Check mle_retvals
+ warnings.warn("Maximum Likelihood optimization failed to "
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/base/model.py:607:
+ConvergenceWarning: Maximum Likelihood optimization failed to 
+converge. Check mle_retvals
+ warnings.warn("Maximum Likelihood optimization failed to "
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/base/model.py:607:
+ConvergenceWarning: Maximum Likelihood optimization failed to 
+converge. Check mle_retvals
+ warnings.warn("Maximum Likelihood optimization failed to "
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/base/model.py:607:
+ConvergenceWarning: Maximum Likelihood optimization failed to 
+converge. Check mle_retvals
+ warnings.warn("Maximum Likelihood optimization failed to "
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/base/model.py:607:
+ConvergenceWarning: Maximum Likelihood optimization failed to 
+converge. Check mle_retvals
+ warnings.warn("Maximum Likelihood optimization failed to "
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/base/model.py:607:
+ConvergenceWarning: Maximum Likelihood optimization failed to 
+converge. Check mle_retvals
+ warnings.warn("Maximum Likelihood optimization failed to "
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a result,
+forecasts cannot be generated. To use the model for forecasting, use 
+one of the supported classes of index.
+ self._init_dates(dates, freq)
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:966: UserWarning: Non-stationary starting autoregressive 
+parameters found. Using zeros as starting parameters.
+ warn('Non-stationary starting autoregressive parameters'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/statespace/
+sarimax.py:978: UserWarning: Non-invertible starting MA parameters 
+found. Using zeros as starting parameters.
+ warn('Non-invertible starting MA parameters found.'
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: ValueWarning: No supported index is available. Prediction 
+results will be given with an integer index beginning at `start`.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:837: FutureWarning: No supported index is available. In the next 
+version, calling this method in a model without a supported index will
+result in an exception.
+ return get_prediction_index(
+/usr/local/lib/python3.11/dist-packages/statsmodels/tsa/base/tsa_model
+.py:473: ValueWarning: An unsupported index was provided. As a resu
